@@ -1,0 +1,134 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>HOME</title>
+
+    <script type="text/javascript" src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.bundle.min.js"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script type="text/javascript" charset="utf-8">
+		window.chartColors = {
+			red: 'rgb(255, 99, 132)',
+			orange: 'rgb(255, 159, 64)',
+			yellow: 'rgb(255, 205, 86)',
+			green: 'rgb(75, 192, 192)',
+			blue: 'rgb(54, 162, 235)',
+			purple: 'rgb(153, 102, 255)',
+			grey: 'rgb(201, 203, 207)'
+		};
+        $(document).ready(function() {
+            dataSet = {
+					labels: [],
+					datasets: [
+						{
+							data: [],
+							label: "Temperature",
+							borderColor: window.chartColors.yellow,
+							fill: false,
+						},
+						{
+							data: [],
+							label: "Humidity",
+							borderColor: window.chartColors.blue,
+							fill: false
+						},
+						{
+							data: [],
+							label: "Heat Index",
+							borderColor: window.chartColors.red,
+							fill: false
+						}
+					]
+				}
+			var chartObj = new Chart(document.getElementById("line-chart"), {
+				type: 'line',
+				data: dataSet,
+				options: {
+					title: {
+						display: true,
+						text: 'Realtime Sensor Data'
+					},
+					scales: {
+                        yAxes: [{
+                            display: true,
+                            ticks: {
+                                suggestedMin: 0,
+                                suggestedMax: 60,
+                                stepSize: 5
+                            }
+                        }],
+						xAxes: [{
+//							type: 'linear',
+							display: true,
+//							scaleLabel: {
+//								display: true,
+//								labelString: 'fpr',
+//								fontStyle: 'bold'
+//							},
+							ticks: {
+//								callback: function(value, index, values) {
+//									return parseFloat(value).toFixed(2);
+//								},
+//								autoSkip: true,
+								maxTicksLimit: 20,
+								stepSize: 1
+							}
+						}]
+                    }
+				}
+			});
+            window.co = chartObj
+
+			function updateData(t, h, hi) {
+                timestamp = new Date();
+				current_time = timestamp.toLocaleString();
+				// current_time = current_time.split(',');
+				chartObj.data.datasets[0].data.push(t);
+                chartObj.data.datasets[1].data.push(h);
+                chartObj.data.datasets[2].data.push(hi);
+                chartObj.data.labels.push(current_time);
+				chartObj.update();
+            }
+
+            var socketio = null;
+            var namespace = "/work"
+            $("input[name='connect']").on("click", function() {
+                console.log("connect");
+                socketio = io.connect(location.protocol+'//'+document.domain+':'+location.port+namespace);
+                socketio.off().on("re_connect", function(msg) {
+                    $(".report").append(msg.msg + "<br />");
+                });
+            });
+
+            $("input[name='start']").on("click", function() {
+                socketio.emit("start");
+                socketio.on("update", function(msg) {
+					console.log(msg)
+					updateData(msg.temperature, msg.humidity, msg.heat_index)
+                });
+            });
+
+            $("input[name='stop']").on("click", function() {
+                socketio.emit("stop");
+                socketio.on("update", function(msg) {
+                    $(".report").append(msg.msg + "<br />");
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="main_container" >
+        <div class="control">
+            <form id="ctrl_form">
+                <input type="button" name="connect" value="connect" />
+                <input type="button" name="start" value="start" />
+                <input type="button" name="stop" value="stop" />
+            </form>
+        </div>
+        <div class="report"></div>
+        <canvas id="line-chart" width="400" height="400"></canvas>
+    </div>
+</body>
+</html>
